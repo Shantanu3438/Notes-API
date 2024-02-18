@@ -4,11 +4,11 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from rest_framework.views import APIView
 from .serializers import UserSignupSerializer, NoteSerializer, NoteHistorySerializer
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from .models import Note, NoteHistory
+from django.contrib.auth.models import User
 
 @api_view(['POST'])
 def signup(request):
@@ -66,7 +66,7 @@ def getNote(request, pk):
         note = Note.objects.get(pk=pk)
     except Note.DoesNotExist:
         return Response({'error':'Note not found'}, status=status.HTTP_404_NOT_FOUND)
-    if note.user != request.user:
+    if (note.user != request.user) and (request.user not in note.sharedUser.all()):
         return Response({'error':'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
     serializer = NoteSerializer(note)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -83,7 +83,7 @@ def updateNote(request, pk):
     except Note.DoesNotExist:
         return Response({'error': 'Note not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    if request.user != note.user:
+    if request.user != note.user and request.user not in note.sharedUser.all():
         return Response({'error': 'You are not authorized to update this note'}, status=status.HTTP_403_FORBIDDEN)
 
     oldTitle = note.title
@@ -117,3 +117,25 @@ def noteHistory(request, pk):
     noteHistory = NoteHistory.objects.filter(note=note)
     serializer = NoteHistorySerializer(noteHistory, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)    
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def shareNote(request, pk, userpk):
+        try:
+            note = Note.objects.get(pk=pk)
+            if note.user != request.user:
+                return Response({"error": "You are not the owner of this note"}, status=status.HTTP_403_FORBIDDEN)
+
+        except Note.DoesNotExist:
+            return Response({"error": "Note does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user = User.objects.get(pk=userpk)
+            note.sharedUser.add(user)
+            return Response({'STATUS':'Note shared'}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            pass
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+

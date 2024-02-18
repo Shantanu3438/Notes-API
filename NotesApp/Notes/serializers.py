@@ -18,8 +18,6 @@ class UserSignupSerializer(serializers.ModelSerializer):
         return user
     
 class NoteSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)  # Nested serializer for user field
-
     class Meta:
         model = Note
         fields = ['id', 'title', 'content', 'created_at', 'user']
