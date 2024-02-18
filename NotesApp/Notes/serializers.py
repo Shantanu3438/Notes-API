@@ -18,11 +18,18 @@ class UserSignupSerializer(serializers.ModelSerializer):
         return user
     
 class NoteSerializer(serializers.ModelSerializer):
+
+    def __init__(self, *args, **kwargs):
+        super(NoteSerializer, self).__init__(*args, **kwargs)
+        if self.context.get('exclude_user_field'):
+            self.fields.pop('user', None)
+
     class Meta:
         model = Note
         fields = ['id', 'title', 'content', 'created_at', 'user']
         
 class NoteHistorySerializer(serializers.ModelSerializer):
+
     class Meta:
         model = NoteHistory
         fields = ['id', 'title', 'content', 'updated_at']

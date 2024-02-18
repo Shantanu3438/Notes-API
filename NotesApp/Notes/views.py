@@ -27,7 +27,8 @@ def login(request):
     user = authenticate(username=username, password=password)
     if user:
         token, _ = Token.objects.get_or_create(user=user)
-        return Response({'token': token.key}, status=200)
+        user = User.objects.get(username=username)
+        return Response({'token': token.key, 'userID': user.id}, status=200)
     else:
         return Response({'error': 'Invalid credentials'}, status=400)
 
@@ -36,7 +37,7 @@ def login(request):
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def createNote(request):
-    serializer = NoteSerializer(data=request.data)
+    serializer = NoteSerializer(data=request.data, context={'exclude_user_field': True})
     if serializer.is_valid():
         serializer.validated_data['user'] = request.user
         serializer.save()
@@ -79,7 +80,6 @@ def getNote(request, pk):
 def updateNote(request, pk):
     try:
         note = Note.objects.get(pk=pk)
-        print(note)
     except Note.DoesNotExist:
         return Response({'error': 'Note not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -89,11 +89,10 @@ def updateNote(request, pk):
     oldTitle = note.title
     oldContent = note.content
 
-    serializer = NoteSerializer(note, data=request.data)
-    print(serializer)
+    serializer = NoteSerializer(note, data=request.data, context={'exclude_user_field': True})
+
     if serializer.is_valid():
         serializer.save()
-        print(serializer)
 
         NoteHistory.objects.create(
             note = note,
@@ -114,9 +113,15 @@ def noteHistory(request, pk):
     except Note.DoesNotExist:
         return Response({"error": "Note does not exist"}, status=status.HTTP_404_NOT_FOUND)
     
+    if request.user != note.user and request.user not in note.sharedUser.all():
+        return Response({'error': 'You are not authorized to update this note'}, status=status.HTTP_403_FORBIDDEN)
+
     noteHistory = NoteHistory.objects.filter(note=note)
+    # if noteHistory:
     serializer = NoteHistorySerializer(noteHistory, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)    
+    # else:
+    #     return Response({'error':'No history for this note found'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
