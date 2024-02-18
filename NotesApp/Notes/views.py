@@ -5,10 +5,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
-from .serializers import UserSignupSerializer, NoteSerializer
+from .serializers import UserSignupSerializer, NoteSerializer, NoteHistorySerializer
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
-from .models import Note
+from .models import Note, NoteHistory
 
 @api_view(['POST'])
 def signup(request):
@@ -86,10 +86,34 @@ def updateNote(request, pk):
     if request.user != note.user:
         return Response({'error': 'You are not authorized to update this note'}, status=status.HTTP_403_FORBIDDEN)
 
+    oldTitle = note.title
+    oldContent = note.content
+
     serializer = NoteSerializer(note, data=request.data)
     print(serializer)
     if serializer.is_valid():
         serializer.save()
         print(serializer)
+
+        NoteHistory.objects.create(
+            note = note,
+            title = oldTitle,
+            content = oldContent
+        )
+
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def noteHistory(request, pk):
+    try:
+        note = Note.objects.get(pk=pk)
+    except Note.DoesNotExist:
+        return Response({"error": "Note does not exist"}, status=status.HTTP_404_NOT_FOUND)
+    
+    noteHistory = NoteHistory.objects.filter(note=note)
+    serializer = NoteHistorySerializer(noteHistory, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)    
