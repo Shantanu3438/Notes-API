@@ -10,5 +10,4 @@ urlpatterns = [
     path('notes/<int:pk>/update/', views.updateNote, name='updateNote'),
     path('notes/<int:pk>/history/', views.noteHistory, name='noteHistory'),
     path('notes/share/<int:pk>/<int:userpk>/', views.shareNote, name='shareNote'),
-
 ]
